@@ -46,9 +46,9 @@ export default function Header({ user, currentTab, onLogout, toggleSidebar }) {
         </button>
 
         <div>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#0f172a" }}>
-            Halo, {user?.nama || "Siswa"}
-          </h2>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#0f172a" }}>
+              {user?.role === "admin" ? "Halo, Admin!" : `Halo, ${user?.nama || "Siswa"}`}
+            </h2>
           <p style={{ fontSize: "0.8rem", color: "#64748b" }}>
             {user?.role === "admin" ? "Admin Administrator" : user?.sekolah || "Siswa Magang"}
           </p>

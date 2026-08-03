@@ -45,9 +45,10 @@ export const initDB = () => {
         hasChanges = true;
       } else if (defUser.id === "admin-1") {
         // Always force-update admin credentials from database.json
-        if (existingUsers[idx].nama !== INITIAL_ADMIN.nama || existingUsers[idx].password !== INITIAL_ADMIN.password) {
+        if (existingUsers[idx].nama !== INITIAL_ADMIN.nama || existingUsers[idx].password !== INITIAL_ADMIN.password || existingUsers[idx].username !== INITIAL_ADMIN.username) {
           existingUsers[idx].nama = INITIAL_ADMIN.nama;
           existingUsers[idx].password = INITIAL_ADMIN.password;
+          existingUsers[idx].username = INITIAL_ADMIN.username;
           hasChanges = true;
         }
       } else if (defUser.id === "std-1" && existingUsers[idx].fotoProfil !== "/alicia-profile.jpg") {
@@ -66,7 +67,13 @@ export const initDB = () => {
     }
 
     const cur = getCurrentUser();
-    if (cur && cur.id === "std-1" && cur.fotoProfil !== "/alicia-profile.jpg") {
+    if (cur && (cur.id === "admin-1" || cur.role === "admin")) {
+      if (cur.nama !== INITIAL_ADMIN.nama || cur.username !== INITIAL_ADMIN.username) {
+        cur.nama = INITIAL_ADMIN.nama;
+        cur.username = INITIAL_ADMIN.username;
+        setCurrentUser(cur);
+      }
+    } else if (cur && cur.id === "std-1" && cur.fotoProfil !== "/alicia-profile.jpg") {
       cur.fotoProfil = "/alicia-profile.jpg";
       setCurrentUser(cur);
     } else if (cur && cur.id === "std-2" && cur.fotoProfil !== "/aisyah-profile.png") {
@@ -153,13 +160,17 @@ export const findUserByNameAndPassword = (nama, password) => {
   const inputPass = password.trim();
 
   // Always check against INITIAL_ADMIN from database.json first (source of truth)
-  const adminNama = INITIAL_ADMIN.nama.trim().toLowerCase();
-  if (inputNama === adminNama && inputPass === INITIAL_ADMIN.password) {
+  const adminNama = (INITIAL_ADMIN.nama || "").trim().toLowerCase();
+  const adminUsername = (INITIAL_ADMIN.username || "").trim().toLowerCase();
+  const isAdminMatch = (inputNama === adminUsername || inputNama === adminNama || inputNama === "admin123" || inputNama === "admin");
+
+  if (isAdminMatch && inputPass === INITIAL_ADMIN.password) {
     // Also force-update localStorage so it stays in sync
     const users = getUsers();
     const adminIdx = users.findIndex(u => u.id === "admin-1");
     if (adminIdx !== -1) {
       users[adminIdx].nama = INITIAL_ADMIN.nama;
+      users[adminIdx].username = INITIAL_ADMIN.username;
       users[adminIdx].password = INITIAL_ADMIN.password;
       localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
     }
@@ -168,8 +179,9 @@ export const findUserByNameAndPassword = (nama, password) => {
 
   const users = getUsers();
   return users.find(u => {
-    const dbNama = u.nama.trim().toLowerCase();
-    const isNameMatch = dbNama === inputNama;
+    const dbNama = (u.nama || "").trim().toLowerCase();
+    const dbUsername = (u.username || "").trim().toLowerCase();
+    const isNameMatch = dbNama === inputNama || dbUsername === inputNama;
     const isPassMatch = u.password === inputPass;
     return isNameMatch && isPassMatch;
   });
