@@ -26,19 +26,11 @@ export default function App() {
 
   useEffect(() => {
     initDB();
-    const activeUser = getCurrentUser();
-    if (activeUser) {
-      setUser(activeUser);
-      setCurrentTab(activeUser.role === "admin" ? "admin-dashboard" : "dashboard");
-    }
+    // Always clear session on app open — every visit starts fresh at the student login page
+    saveSessionUser(null);
 
     // Fetch initial Cloud DB & start 6-second realtime background sync across all laptops/devices
-    fetchCloudDB().then(() => {
-      const refreshedUser = getCurrentUser();
-      if (refreshedUser) {
-        setUser(refreshedUser);
-      }
-    });
+    fetchCloudDB();
 
     const interval = setInterval(() => {
       fetchCloudDB();
