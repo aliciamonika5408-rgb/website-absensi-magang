@@ -67,8 +67,20 @@ export const initDB = () => {
       }
     });
 
-    if (hasChanges) {
-      localStorage.setItem(DB_KEYS.USERS, JSON.stringify(existingUsers));
+    // Deduplicate existingUsers by ID (clean up any previous duplicates)
+    const seenIds = new Set();
+    const cleanUsers = [];
+    existingUsers.forEach(u => {
+      if (!seenIds.has(u.id)) {
+        seenIds.add(u.id);
+        cleanUsers.push(u);
+      } else {
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges || cleanUsers.length !== existingUsers.length) {
+      localStorage.setItem(DB_KEYS.USERS, JSON.stringify(cleanUsers));
     }
 
     const cur = getCurrentUser();
@@ -272,6 +284,11 @@ export const saveAttendanceRecords = (records) => {
     // Ignore in non-browser env
   }
   syncDatabaseDisk(null, records);
+};
+
+export const deleteAttendanceRecord = (recordId) => {
+  const records = getAttendanceRecords().filter(r => r.id !== recordId);
+  saveAttendanceRecords(records);
 };
 
 export const getStudentAttendanceHistory = (studentId) => {
