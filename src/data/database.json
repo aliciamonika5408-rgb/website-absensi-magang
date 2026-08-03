@@ -26,67 +26,6 @@
     "noHp": "081100001111",
     "fotoProfil": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80"
   },
-  "students": [
-    {
-      "id": "std-1",
-      "nama": "Alicia Monica",
-      "pin": "12121",
-      "role": "siswa",
-      "sekolah": "SMKN 2 SURABAYA",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "085955595369",
-      "fotoProfil": "/alicia-profile.jpg"
-    },
-    {
-      "id": "std-2",
-      "nama": "Aisyah Yuanita",
-      "pin": "15049",
-      "role": "siswa",
-      "sekolah": "SMKN 2 SURABAYA",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "085882487732",
-      "fotoProfil": "/aisyah-profile.png"
-    },
-    {
-      "id": "std-3",
-      "nama": "Rizky (Kiki)",
-      "pin": "13015",
-      "role": "siswa",
-      "sekolah": "Institut Teknologi Sepuluh Nopember",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "081337466129",
-      "fotoProfil": "/default-avatar.png"
-    },
-    {
-      "id": "std-4",
-      "nama": "Glen",
-      "pin": "09087",
-      "role": "siswa",
-      "sekolah": "STIE IBMT",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "088228350129",
-      "fotoProfil": "/default-avatar.png"
-    },
-    {
-      "id": "std-5",
-      "nama": "Muhammad davin Nararya tsaqif",
-      "pin": "01010",
-      "role": "siswa",
-      "sekolah": "SMK Telkom Malang",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "082183485393",
-      "fotoProfil": "/default-avatar.png"
-    },
-    {
-      "id": "std-6",
-      "nama": "Abdur Rasyid Hibatullah Wibisono",
-      "pin": "24049",
-      "role": "siswa",
-      "sekolah": "SMK Telkom Malang",
-      "tempatMagang": "PT. MULTI POWER ABADI",
-      "noHp": "081536925803",
-      "fotoProfil": "/default-avatar.png"
-    }
-  ],
+  "students": [],
   "attendanceRecords": []
 }
