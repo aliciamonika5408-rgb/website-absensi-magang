@@ -115,8 +115,14 @@ export const getUsers = () => {
 
 const CLOUD_DB_URL = "https://jsonblob.com/api/jsonBlob/019fc670-75fd-740b-98ac-48d2fbb1f326";
 
+// Track last push timestamp to prevent fetch overwriting a pending push
+let _lastPushTime = 0;
+
 // Sync Cloud Database to Local Storage
 export const fetchCloudDB = async () => {
+  // Skip fetch if a push just happened within the last 5 seconds
+  if (Date.now() - _lastPushTime < 5000) return false;
+
   try {
     const res = await fetch(CLOUD_DB_URL, {
       headers: { "Accept": "application/json" }
@@ -147,6 +153,7 @@ export const fetchCloudDB = async () => {
 
 // Push Local Storage to Cloud Database
 export const pushCloudDB = async (customUsers = null, customRecords = null) => {
+  _lastPushTime = Date.now(); // mark push time to pause fetchCloudDB for 5s
   try {
     const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
     const attendanceRecords = customRecords || JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
@@ -162,6 +169,7 @@ export const pushCloudDB = async (customUsers = null, customRecords = null) => {
         attendance: attendanceRecords
       })
     });
+    console.log("Cloud DB push complete. Users:", allUsers.filter(u => u.role === "siswa").length, "students");
   } catch (e) {
     console.warn("Cloud DB push notice:", e);
   }
@@ -257,7 +265,11 @@ export const addStudent = (studentData) => {
     newStudent.fotoProfil = "/default-avatar.svg";
   }
   users.push(newStudent);
-  saveUsers(users);
+  // Save to localStorage immediately
+  localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+  window.dispatchEvent(new CustomEvent("users_updated"));
+  // Push to Cloud DB immediately so all laptops see the new student
+  pushCloudDB(users, null);
   return newStudent;
 };
 
@@ -297,7 +309,11 @@ export const updateStudent = (studentData) => {
 
 export const deleteStudent = (studentId) => {
   const users = getUsers().filter(u => u.id !== studentId);
-  saveUsers(users);
+  // Save to localStorage immediately
+  localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+  window.dispatchEvent(new CustomEvent("users_updated"));
+  // Push deletion to Cloud DB immediately so all laptops stay in sync
+  pushCloudDB(users, null);
 };
 
 export const resetPassword = (studentId, newPassword) => {
@@ -338,7 +354,8 @@ export const saveAttendanceRecords = (records) => {
   } catch (e) {
     // Ignore in non-browser env
   }
-  syncDatabaseDisk(null, records);
+  // Push to Cloud DB so all devices get the updated attendance
+  pushCloudDB(null, records);
 };
 
 export const deleteAttendanceRecord = (recordId) => {
