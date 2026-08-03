@@ -30,38 +30,43 @@ export const hashPassword = (plainPassword) => {
 
 // Database Initialization
 export const initDB = () => {
-  // Always ensure default users exist in DB
+  // Always ensure default users exist in DB on first run
   const defaultUsers = [INITIAL_ADMIN, ...INITIAL_STUDENTS];
   if (!localStorage.getItem(DB_KEYS.USERS)) {
     localStorage.setItem(DB_KEYS.USERS, JSON.stringify(defaultUsers));
   } else {
-    // Sync missing students into local storage if any
+    // Only update admin credentials & existing profile photos, DO NOT re-add deleted users
     const existingUsers = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
     let hasChanges = false;
-    defaultUsers.forEach(defUser => {
-      const idx = existingUsers.findIndex(u => u.id === defUser.id);
-      if (idx === -1) {
-        existingUsers.push(defUser);
+
+    // Ensure Admin always exists
+    const adminIdx = existingUsers.findIndex(u => u.id === "admin-1" || u.role === "admin");
+    if (adminIdx === -1) {
+      existingUsers.unshift(INITIAL_ADMIN);
+      hasChanges = true;
+    } else {
+      if (existingUsers[adminIdx].nama !== INITIAL_ADMIN.nama || existingUsers[adminIdx].password !== INITIAL_ADMIN.password || existingUsers[adminIdx].username !== INITIAL_ADMIN.username) {
+        existingUsers[adminIdx].nama = INITIAL_ADMIN.nama;
+        existingUsers[adminIdx].password = INITIAL_ADMIN.password;
+        existingUsers[adminIdx].username = INITIAL_ADMIN.username;
         hasChanges = true;
-      } else if (defUser.id === "admin-1") {
-        // Always force-update admin credentials from database.json
-        if (existingUsers[idx].nama !== INITIAL_ADMIN.nama || existingUsers[idx].password !== INITIAL_ADMIN.password || existingUsers[idx].username !== INITIAL_ADMIN.username) {
-          existingUsers[idx].nama = INITIAL_ADMIN.nama;
-          existingUsers[idx].password = INITIAL_ADMIN.password;
-          existingUsers[idx].username = INITIAL_ADMIN.username;
-          hasChanges = true;
-        }
-      } else if (defUser.id === "std-1" && existingUsers[idx].fotoProfil !== "/alicia-profile.jpg") {
-        existingUsers[idx].fotoProfil = "/alicia-profile.jpg";
+      }
+    }
+
+    // Update avatar paths for existing students
+    existingUsers.forEach(u => {
+      if (u.id === "std-1" && u.fotoProfil !== "/alicia-profile.jpg") {
+        u.fotoProfil = "/alicia-profile.jpg";
         hasChanges = true;
-      } else if (defUser.id === "std-2" && existingUsers[idx].fotoProfil !== "/aisyah-profile.png") {
-        existingUsers[idx].fotoProfil = "/aisyah-profile.png";
+      } else if (u.id === "std-2" && u.fotoProfil !== "/aisyah-profile.png") {
+        u.fotoProfil = "/aisyah-profile.png";
         hasChanges = true;
-      } else if (["std-3", "std-4", "std-5", "std-6"].includes(defUser.id) && existingUsers[idx].fotoProfil !== "/default-avatar.png") {
-        existingUsers[idx].fotoProfil = "/default-avatar.png";
+      } else if (["std-3", "std-4", "std-5", "std-6"].includes(u.id) && u.fotoProfil !== "/default-avatar.png") {
+        u.fotoProfil = "/default-avatar.png";
         hasChanges = true;
       }
     });
+
     if (hasChanges) {
       localStorage.setItem(DB_KEYS.USERS, JSON.stringify(existingUsers));
     }
@@ -87,20 +92,6 @@ export const initDB = () => {
 
   if (!localStorage.getItem(DB_KEYS.ATTENDANCE)) {
     localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(initialData.attendanceRecords || []));
-  } else {
-    const existingRecords = JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
-    const jsonRecords = initialData.attendanceRecords || [];
-    let hasChanges = false;
-    jsonRecords.forEach(jRec => {
-      const idx = existingRecords.findIndex(r => r.id === jRec.id || (r.studentId === jRec.studentId && r.tanggal === jRec.tanggal));
-      if (idx === -1) {
-        existingRecords.push(jRec);
-        hasChanges = true;
-      }
-    });
-    if (hasChanges) {
-      localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(existingRecords));
-    }
   }
 };
 
