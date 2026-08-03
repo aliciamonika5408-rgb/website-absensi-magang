@@ -16,7 +16,7 @@ import AdminResetPassword from "./pages/AdminResetPassword";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 
-import { getCurrentUser, setCurrentUser as saveSessionUser, initDB } from "./services/db";
+import { getCurrentUser, setCurrentUser as saveSessionUser, initDB, fetchCloudDB } from "./services/db";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -31,6 +31,20 @@ export default function App() {
       setUser(activeUser);
       setCurrentTab(activeUser.role === "admin" ? "admin-dashboard" : "dashboard");
     }
+
+    // Fetch initial Cloud DB & start 6-second realtime background sync across all laptops/devices
+    fetchCloudDB().then(() => {
+      const refreshedUser = getCurrentUser();
+      if (refreshedUser) {
+        setUser(refreshedUser);
+      }
+    });
+
+    const interval = setInterval(() => {
+      fetchCloudDB();
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleLoginSuccess = (loggedInUser) => {

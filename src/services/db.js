@@ -113,8 +113,63 @@ export const getUsers = () => {
   return JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
 };
 
-// Auto Sync to Disk Endpoint
+const CLOUD_DB_URL = "https://jsonblob.com/api/jsonBlob/019fc670-75fd-740b-98ac-48d2fbb1f326";
+
+// Sync Cloud Database to Local Storage
+export const fetchCloudDB = async () => {
+  try {
+    const res = await fetch(CLOUD_DB_URL, {
+      headers: { "Accept": "application/json" }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      let updated = false;
+
+      if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+        localStorage.setItem(DB_KEYS.USERS, JSON.stringify(data.users));
+        window.dispatchEvent(new CustomEvent("users_updated"));
+        updated = true;
+      }
+
+      if (data.attendance && Array.isArray(data.attendance)) {
+        localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(data.attendance));
+        window.dispatchEvent(new CustomEvent("attendance_updated"));
+        updated = true;
+      }
+
+      return updated;
+    }
+  } catch (e) {
+    console.warn("Cloud DB fetch notice:", e);
+  }
+  return false;
+};
+
+// Push Local Storage to Cloud Database
+export const pushCloudDB = async (customUsers = null, customRecords = null) => {
+  try {
+    const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
+    const attendanceRecords = customRecords || JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
+
+    await fetch(CLOUD_DB_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        users: allUsers,
+        attendance: attendanceRecords
+      })
+    });
+  } catch (e) {
+    console.warn("Cloud DB push notice:", e);
+  }
+};
+
+// Auto Sync to Disk Endpoint & Cloud DB
 export const syncDatabaseDisk = (customUsers = null, customRecords = null) => {
+  pushCloudDB(customUsers, customRecords);
   try {
     const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
     const students = allUsers.filter(u => u.role === "siswa");
