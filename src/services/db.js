@@ -39,10 +39,17 @@ export const initDB = () => {
     const existingUsers = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
     let hasChanges = false;
     defaultUsers.forEach(defUser => {
-      const idx = existingUsers.findIndex(u => u.id === defUser.id || u.nama.toLowerCase() === defUser.nama.toLowerCase());
+      const idx = existingUsers.findIndex(u => u.id === defUser.id);
       if (idx === -1) {
         existingUsers.push(defUser);
         hasChanges = true;
+      } else if (defUser.id === "admin-1") {
+        // Always force-update admin credentials from database.json
+        if (existingUsers[idx].nama !== INITIAL_ADMIN.nama || existingUsers[idx].password !== INITIAL_ADMIN.password) {
+          existingUsers[idx].nama = INITIAL_ADMIN.nama;
+          existingUsers[idx].password = INITIAL_ADMIN.password;
+          hasChanges = true;
+        }
       } else if (defUser.id === "std-1" && existingUsers[idx].fotoProfil !== "/alicia-profile.jpg") {
         existingUsers[idx].fotoProfil = "/alicia-profile.jpg";
         hasChanges = true;
@@ -142,13 +149,27 @@ export const findUserByPin = (pin) => {
 };
 
 export const findUserByNameAndPassword = (nama, password) => {
-  const users = getUsers();
   const inputNama = nama.trim().toLowerCase();
   const inputPass = password.trim();
 
+  // Always check against INITIAL_ADMIN from database.json first (source of truth)
+  const adminNama = INITIAL_ADMIN.nama.trim().toLowerCase();
+  if (inputNama === adminNama && inputPass === INITIAL_ADMIN.password) {
+    // Also force-update localStorage so it stays in sync
+    const users = getUsers();
+    const adminIdx = users.findIndex(u => u.id === "admin-1");
+    if (adminIdx !== -1) {
+      users[adminIdx].nama = INITIAL_ADMIN.nama;
+      users[adminIdx].password = INITIAL_ADMIN.password;
+      localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+    }
+    return { ...INITIAL_ADMIN };
+  }
+
+  const users = getUsers();
   return users.find(u => {
     const dbNama = u.nama.trim().toLowerCase();
-    const isNameMatch = dbNama === inputNama || (inputNama.includes("alicia") && dbNama.includes("alicia"));
+    const isNameMatch = dbNama === inputNama;
     const isPassMatch = u.password === inputPass;
     return isNameMatch && isPassMatch;
   });

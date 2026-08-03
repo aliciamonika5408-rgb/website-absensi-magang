@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+ import React, { useState } from "react";
 import { Lock, User, ShieldCheck, AlertCircle, ShieldAlert, ArrowLeft } from "lucide-react";
 import { findUserByNameAndPassword } from "../services/db";
-
 export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -11,13 +10,19 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
     e.preventDefault();
     setErrorMsg("");
 
-    const admin = findUserByNameAndPassword(username, password);
-    if (admin && admin.role === "admin") {
-      onLoginSuccess(admin);
-    } else {
-      setErrorMsg("Kredensial Administrator tidak valid. Periksa username dan password.");
-    }
-  };
+    console.log("Username:", username);
+  console.log("Password:", password);
+
+  const admin = findUserByNameAndPassword(username, password);
+
+  console.log("Hasil login:", admin);
+
+  if (admin && admin.role === "admin") {
+    onLoginSuccess(admin);
+  } else {
+    setErrorMsg("Kredensial Administrator tidak valid. Periksa username dan password.");
+  }
+};
 
   return (
     <div

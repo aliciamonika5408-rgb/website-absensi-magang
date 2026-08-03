@@ -14,8 +14,8 @@
   },
   "admin": {
     "id": "admin-1",
-    "nama": "Admin",
-    "password": "admin123",
+    "nama": "admin123",
+    "password": "admin",
     "pin": "999999",
     "role": "admin",
     "sekolah": "Pusat Pengelola Magang",
