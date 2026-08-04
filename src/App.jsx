@@ -26,8 +26,13 @@ export default function App() {
 
   useEffect(() => {
     initDB();
-    // Always clear session on app open — every visit starts fresh at the student login page
-    saveSessionUser(null);
+
+    // Restore active session from localStorage (preserves login on hard refresh)
+    const savedUser = getCurrentUser();
+    if (savedUser) {
+      setUser(savedUser);
+      setCurrentTab(savedUser.role === "admin" ? "admin-dashboard" : "dashboard");
+    }
 
     // Fetch initial Cloud DB & start 6-second realtime background sync across all laptops/devices
     fetchCloudDB();
@@ -38,6 +43,7 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, []);
+
 
   const handleLoginSuccess = (loggedInUser) => {
     setUser(loggedInUser);
