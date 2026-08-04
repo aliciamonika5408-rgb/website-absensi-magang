@@ -1,175 +1,150 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Users, Printer } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { getAttendanceRecords, getStudents } from "../services/db";
+import { Search, UserPlus, Edit, Trash2, X, Key, Phone, Building } from "lucide-react";
+import { getStudents, addStudent, updateStudent, deleteStudent } from "../services/db";
 
-export default function AdminDataAbsensi() {
-  const [absensiList, setAbsensiList] = useState([]);
-  const [siswaList, setSiswaList] = useState([]);
-  
-  // State untuk Filter Data
+export default function AdminDataSiswa() {
+  const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSiswa, setSelectedSiswa] = useState("semua");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
 
-  // Ambil data dari database/localStorage saat komponen dimuat
-  useEffect(() => {
-    loadData();
-  }, []);
-
-const loadData = () => {
-    const dataAbsensi = getAttendanceRecords() || [];
-    const dataSiswa = getStudents() || [];
-    setAbsensiList(dataAbsensi);
-    setSiswaList(dataSiswa);
-};
-
-  // Logika Penyaringan (Filtering) Data Absensi
-  const filteredAbsensi = absensiList.filter((item) => {
-    const matchQuery =
-      (item.namaSiswa && item.namaSiswa.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.ketMasuk && item.ketMasuk.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.ketPulang && item.ketPulang.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchSiswa =
-      selectedSiswa === "semua" || item.namaSiswa === selectedSiswa || item.siswaId === selectedSiswa;
-
-    const matchDate = !selectedDate || item.tanggal === selectedDate;
-
-    return matchQuery && matchSiswa && matchDate;
+  const [formData, setFormData] = useState({
+    nama: "",
+    pin: "",
+    sekolah: "",
+    tempatMagang: "PT. MULTI POWER ABADI",
+    noHp: ""
   });
 
-  // FUNGSI UTAMA: Cetak & Export File PDF
-  const handleExportPDF = () => {
-    if (filteredAbsensi.length === 0) {
-      alert("Tidak ada data absensi untuk dicetak!");
+  const loadData = () => {
+    const data = getStudents() || [];
+    setStudents(data);
+  };
+
+  useEffect(() => {
+    loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener("users_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("users_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, []);
+
+  const handleOpenAddModal = () => {
+    setEditingStudent(null);
+    setFormData({
+      nama: "",
+      pin: Math.floor(10000 + Math.random() * 90000).toString(),
+      sekolah: "",
+      tempatMagang: "PT. MULTI POWER ABADI",
+      noHp: ""
+    });
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (student) => {
+    setEditingStudent(student);
+    setFormData({
+      nama: student.nama || "",
+      pin: student.pin || "",
+      sekolah: student.sekolah || "",
+      tempatMagang: student.tempatMagang || "PT. MULTI POWER ABADI",
+      noHp: student.noHp || ""
+    });
+    setShowModal(true);
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.nama.trim() || !formData.pin.trim()) {
+      alert("Nama dan PIN wajib diisi!");
       return;
     }
 
-    // 1. Buat dokumen PDF baru (A4 Portrait)
-    const doc = new jsPDF("p", "mm", "a4");
+    if (editingStudent) {
+      updateStudent({
+        id: editingStudent.id,
+        ...formData
+      });
+    } else {
+      addStudent(formData);
+    }
 
-    // 2. Tambahkan Header / Kop Laporan
-    doc.setFontSize(16);
-    doc.setTextColor(15, 23, 42); // Warna Dark Slate
-    doc.text("LAPORAN ABSENSI SISWA MAGANG", 14, 18);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // Warna Slate Grey
-    doc.text("PT. MULTI POWER ABADI", 14, 24);
-    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString("id-ID")}`, 14, 29);
-
-    // Garis Pemisah Kop Surat
-    doc.setDrawColor(226, 232, 240);
-    doc.line(14, 32, 196, 32);
-
-    // 3. Susun Baris Data untuk Tabel
-    const tableData = filteredAbsensi.map((item, index) => [
-      index + 1,
-      item.tanggal || "-",
-      item.namaSiswa || "-",
-      item.jamMasuk || "-",
-      item.ketMasuk || "-",
-      item.jamPulang || "-",
-      item.ketPulang || "-",
-      item.status || "Hadir"
-    ]);
-
-    // 4. Render Tabel Menggunakan autoTable
-    autoTable(doc, {
-      startY: 36,
-      head: [
-        [
-          "No",
-          "Tanggal",
-          "Nama Siswa",
-          "Jam Masuk",
-          "Ket. Masuk",
-          "Jam Pulang",
-          "Ket. Pulang",
-          "Status"
-        ]
-      ],
-      body: tableData,
-      theme: "grid",
-      headStyles: {
-        fillColor: [220, 38, 38], // Warna Merah (#dc2626)
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 9
-      },
-      bodyStyles: {
-        fontSize: 8,
-        textColor: [51, 65, 85]
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252]
-      }
-    });
-
-    // 5. Unduh File PDF
-    doc.save(`Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.pdf`);
+    setShowModal(false);
+    loadData();
   };
+
+  const handleDelete = (student) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data siswa "${student.nama}"?`)) {
+      deleteStudent(student.id);
+      loadData();
+    }
+  };
+
+  const filteredStudents = students.filter((s) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      (s.nama && s.nama.toLowerCase().includes(query)) ||
+      (s.pin && s.pin.includes(query)) ||
+      (s.sekolah && s.sekolah.toLowerCase().includes(query)) ||
+      (s.noHp && s.noHp.includes(query))
+    );
+  });
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       {/* Header Halaman */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#0f172a" }}>
-            Data Master Absensi
+            Data Siswa Magang
           </h1>
           <p style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "4px" }}>
-            Seluruh histori presensi siswa magang dengan rincian keterangan absen masuk & pulang.
+            Kelola daftar siswa magang, PIN login, sekolah instansi, dan informasi kontak.
           </p>
         </div>
 
-        {/* Tombol Cetak / PDF */}
-        <div>
-          <button
-            onClick={handleExportPDF}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              backgroundColor: "#dc2626",
-              color: "#ffffff",
-              border: "none",
-              padding: "0.6rem 1.25rem",
-              borderRadius: "0.5rem",
-              fontSize: "0.875rem",
-              fontWeight: "700",
-              cursor: "pointer",
-              boxShadow: "0 2px 4px rgba(220, 38, 38, 0.2)"
-            }}
-          >
-            <Printer size={18} /> Cetak / PDF
-          </button>
-        </div>
+        <button
+          onClick={handleOpenAddModal}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            backgroundColor: "#dc2626",
+            color: "#ffffff",
+            border: "none",
+            padding: "0.65rem 1.25rem",
+            borderRadius: "0.5rem",
+            fontSize: "0.875rem",
+            fontWeight: "700",
+            cursor: "pointer",
+            boxShadow: "0 2px 4px rgba(220, 38, 38, 0.2)",
+            transition: "all 0.2s"
+          }}
+        >
+          <UserPlus size={18} /> Tambah Siswa Baru
+        </button>
       </div>
 
-      {/* Baris Filter */}
+      {/* Filter Bar / Search */}
       <div
         style={{
           backgroundColor: "#ffffff",
           borderRadius: "0.75rem",
           padding: "1rem",
           border: "1px solid #e2e8f0",
-          marginBottom: "1.5rem",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "1rem"
+          marginBottom: "1.5rem"
         }}
       >
-        {/* Filter Pencarian */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", maxWidth: "400px" }}>
           <Search size={18} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari siswa atau keterangan..."
+            placeholder="Cari nama, PIN, atau asal sekolah..."
             style={{
               width: "100%",
               padding: "0.55rem 0.75rem 0.55rem 2.5rem",
@@ -180,97 +155,103 @@ const loadData = () => {
             }}
           />
         </div>
-
-        {/* Filter Pilih Siswa */}
-        <div style={{ position: "relative" }}>
-          <Users size={18} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
-          <select
-            value={selectedSiswa}
-            onChange={(e) => setSelectedSiswa(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.55rem 0.75rem 0.55rem 2.5rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #cbd5e1",
-              fontSize: "0.875rem",
-              outline: "none",
-              backgroundColor: "#ffffff"
-            }}
-          >
-            <option value="semua">Semua Siswa Magang</option>
-            {siswaList.map((s, i) => (
-              <option key={i} value={s.nama || s.namaSiswa}>
-                {s.nama || s.namaSiswa}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Filter Tanggal */}
-        <div style={{ position: "relative" }}>
-          <Calendar size={18} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.55rem 0.75rem 0.55rem 2.5rem",
-              borderRadius: "0.5rem",
-              border: "1px solid #cbd5e1",
-              fontSize: "0.875rem",
-              outline: "none",
-              color: selectedDate ? "#0f172a" : "#94a3b8"
-            }}
-          />
-        </div>
       </div>
 
-      {/* Tabel Data Absensi */}
+      {/* Tabel Data Siswa */}
       <div style={{ backgroundColor: "#ffffff", borderRadius: "0.75rem", border: "1px solid #e2e8f0", overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
             <thead>
               <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#475569" }}>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Tanggal</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Nama Siswa</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Jam Masuk</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Keterangan Absen Masuk</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Jam Pulang</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Keterangan Absen Pulang</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Status</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Siswa Magang</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>PIN Login</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Asal Sekolah / Instansi</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Tempat Magang</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>No. HP / WhatsApp</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", textAlign: "center" }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {filteredAbsensi.length > 0 ? (
-                filteredAbsensi.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "0.85rem 1rem", color: "#334155" }}>{row.tanggal || "-"}</td>
-                    <td style={{ padding: "0.85rem 1rem", fontWeight: "600", color: "#0f172a" }}>{row.namaSiswa || "-"}</td>
-                    <td style={{ padding: "0.85rem 1rem", color: "#16a34a", fontWeight: "600" }}>{row.jamMasuk || "-"}</td>
-                    <td style={{ padding: "0.85rem 1rem", color: "#64748b" }}>{row.ketMasuk || "-"}</td>
-                    <td style={{ padding: "0.85rem 1rem", color: "#dc2626", fontWeight: "600" }}>{row.jamPulang || "-"}</td>
-                    <td style={{ padding: "0.85rem 1rem", color: "#64748b" }}>{row.ketPulang || "-"}</td>
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map((s) => (
+                  <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "0.85rem 1rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <img
+                          src={s.fotoProfil || "/default-avatar.png"}
+                          alt={s.nama}
+                          onError={(e) => { e.target.src = "/default-avatar.png"; }}
+                          style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: "1px solid #cbd5e1" }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: "700", color: "#0f172a" }}>{s.nama}</div>
+                          <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ID: {s.id}</div>
+                        </div>
+                      </div>
+                    </td>
                     <td style={{ padding: "0.85rem 1rem" }}>
                       <span
                         style={{
-                          backgroundColor: row.status === "Izin" ? "#fef3c7" : "#dcfce7",
-                          color: row.status === "Izin" ? "#d97706" : "#15803d",
-                          padding: "0.25rem 0.6rem",
+                          backgroundColor: "#f0fdf4",
+                          color: "#166534",
+                          border: "1px solid #bbf7d0",
+                          padding: "0.2rem 0.5rem",
                           borderRadius: "0.375rem",
-                          fontSize: "0.75rem",
-                          fontWeight: "700"
+                          fontWeight: "800",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem"
                         }}
                       >
-                        {row.status || "Hadir"}
+                        🔑 {s.pin}
                       </span>
+                    </td>
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155", fontWeight: "500" }}>
+                      {s.sekolah || "-"}
+                    </td>
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155", fontWeight: "600" }}>
+                      {s.tempatMagang || "PT. MULTI POWER ABADI"}
+                    </td>
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155" }}>
+                      {s.noHp || "-"}
+                    </td>
+                    <td style={{ padding: "0.85rem 1rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+                        <button
+                          onClick={() => handleOpenEditModal(s)}
+                          title="Edit Data Siswa & PIN"
+                          style={{
+                            backgroundColor: "#eff6ff",
+                            color: "#2563eb",
+                            border: "1px solid #bfdbfe",
+                            padding: "0.4rem 0.6rem",
+                            borderRadius: "0.5rem",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Edit size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(s)}
+                          title="Hapus Siswa"
+                          style={{
+                            backgroundColor: "#fef2f2",
+                            color: "#ef4444",
+                            border: "1px solid #fecaca",
+                            padding: "0.4rem 0.6rem",
+                            borderRadius: "0.5rem",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" style={{ padding: "3rem 1rem", textAlign: "center", color: "#94a3b8" }}>
-                    Tidak ada data absensi yang sesuai filter.
+                  <td colSpan="6" style={{ padding: "3rem 1rem", textAlign: "center", color: "#94a3b8" }}>
+                    Tidak ada siswa ditemukan.
                   </td>
                 </tr>
               )}
@@ -278,6 +259,130 @@ const loadData = () => {
           </table>
         </div>
       </div>
+
+      {/* Add / Edit Student Modal */}
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(4px)",
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "1.5rem",
+              width: "100%",
+              maxWidth: "480px",
+              padding: "1.75rem",
+              boxShadow: "0 20px 30px -10px rgba(0, 0, 0, 0.2)",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: "800", color: "#0f172a" }}>
+                {editingStudent ? "Edit Data Siswa" : "Tambah Siswa Magang"}
+              </h3>
+              <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+                <X size={22} />
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit}>
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#334155", marginBottom: "0.2rem" }}>
+                  Nama Lengkap Siswa *
+                </label>
+                <input
+                  type="text"
+                  value={formData.nama}
+                  onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
+                  required
+                  placeholder="Masukkan nama lengkap siswa..."
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#dc2626", marginBottom: "0.2rem" }}>
+                  🔑 PIN LOGIN (5-6 DIGIT) *
+                </label>
+                <input
+                  type="text"
+                  value={formData.pin}
+                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/[^0-9]/g, "") })}
+                  required
+                  maxLength={6}
+                  placeholder="Masukkan PIN login siswa..."
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: "0.5rem", border: "1.5px solid #a7f3d0", fontSize: "0.95rem", fontFamily: "monospace", fontWeight: "800", backgroundColor: "#ecfdf5", color: "#047857" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#334155", marginBottom: "0.2rem" }}>
+                    Sekolah / Instansi
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sekolah}
+                    onChange={(e) => setFormData({ ...formData, sekolah: e.target.value })}
+                    placeholder="SMKN 2 SURABAYA..."
+                    style={{ width: "100%", padding: "0.6rem 0.85rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#334155", marginBottom: "0.2rem" }}>
+                    Tempat Magang
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.tempatMagang}
+                    onChange={(e) => setFormData({ ...formData, tempatMagang: e.target.value })}
+                    style={{ width: "100%", padding: "0.6rem 0.85rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#334155", marginBottom: "0.2rem" }}>
+                  Nomor Handphone Siswa
+                </label>
+                <input
+                  type="text"
+                  value={formData.noHp}
+                  onChange={(e) => setFormData({ ...formData, noHp: e.target.value })}
+                  placeholder="081234567890"
+                  style={{ width: "100%", padding: "0.6rem 0.85rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  padding: "0.75rem",
+                  borderRadius: "0.75rem",
+                  fontWeight: "700",
+                  border: "none",
+                  cursor: "pointer"
+                }}
+              >
+                {editingStudent ? "Simpan Perubahan" : "Simpan Siswa"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

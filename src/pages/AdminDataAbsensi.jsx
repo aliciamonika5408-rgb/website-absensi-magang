@@ -13,17 +13,26 @@ export default function AdminDataAbsensi() {
   const [selectedSiswa, setSelectedSiswa] = useState("semua");
   const [selectedDate, setSelectedDate] = useState("");
 
-  // Load Data saat komponen dimuat
+  const loadData = () => {
+    const dataAbsensi = getAttendanceRecords() || [];
+    const dataSiswa = getStudents() || [];
+    setAbsensiList(dataAbsensi);
+    setSiswaList(dataSiswa);
+  };
+
   useEffect(() => {
     loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener("attendance_updated", handleUpdate);
+    window.addEventListener("users_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("attendance_updated", handleUpdate);
+      window.removeEventListener("users_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
- const loadData = () => {
-  const dataAbsensi = getAttendanceRecords() || [];
-  const dataSiswa = getStudents() || [];
-  setAbsensiList(dataAbsensi);
-  setSiswaList(dataSiswa);
-};
 
   // Logika Filter Data Absensi
   const filteredAbsensi = absensiList.filter((item) => {
