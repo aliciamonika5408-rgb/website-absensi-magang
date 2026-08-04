@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Calendar, Users, Printer, Download, RefreshCw } from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import { getAbsensiData, getSiswaData } from "../services/db";
+import { getAttendanceRecords, getStudents } from "../services/db";
 
 export default function AdminDataAbsensi() {
   const [absensiList, setAbsensiList] = useState([]);
@@ -18,12 +18,12 @@ export default function AdminDataAbsensi() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const dataAbsensi = getAbsensiData() || [];
-    const dataSiswa = getSiswaData() || [];
-    setAbsensiList(dataAbsensi);
-    setSiswaList(dataSiswa);
-  };
+ const loadData = () => {
+  const dataAbsensi = getAttendanceRecords() || [];
+  const dataSiswa = getStudents() || [];
+  setAbsensiList(dataAbsensi);
+  setSiswaList(dataSiswa);
+};
 
   // Logika Filter Data Absensi
   const filteredAbsensi = absensiList.filter((item) => {
