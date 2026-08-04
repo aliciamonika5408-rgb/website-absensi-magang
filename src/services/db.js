@@ -12,7 +12,7 @@ const DB_KEYS = {
   CURRENT_USER: "absensi_magang_current_user_v1"
 };
 
-// Helper Data Mappers for Supabase (PostgreSQL column names mapping)
+// Data Mappers between Supabase PostgreSQL column names and JS objects
 const mapUserFromSupabase = (u) => ({
   id: u.id,
   nama: u.nama,
@@ -70,7 +70,7 @@ const mapAbsensiToSupabase = (a) => ({
   status_lokasi: a.statusLokasi || "Di Area Magang"
 });
 
-// Simple pseudo-hashing for admin view demonstration
+// Helper hash password
 export const hashPassword = (plainPassword) => {
   if (!plainPassword) return "$2b$10$e8F...";
   let hash = 0;
@@ -82,7 +82,7 @@ export const hashPassword = (plainPassword) => {
   return `$2b$10$${hex}x9K2mL8q1vP3wZ${hex.slice(0, 4)}`;
 };
 
-// Database Initialization
+// Database Initialization (Ensures local fallback data exists and triggers Supabase sync)
 export const initDB = () => {
   const defaultUsers = [INITIAL_ADMIN, ...INITIAL_STUDENTS];
   if (!localStorage.getItem(DB_KEYS.USERS)) {
@@ -124,11 +124,10 @@ export const initDB = () => {
     localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(initialData.attendanceRecords || []));
   }
 
-  // Trigger async Supabase fetch in background
   fetchCloudDB();
 };
 
-// Sync Cloud Supabase Database to Local Storage
+// Sync Data from Supabase Cloud to LocalStorage
 export const fetchCloudDB = async () => {
   try {
     const { data: usersData, error: usersErr } = await supabase.from("users").select("*");
@@ -161,7 +160,7 @@ export const fetchCloudDB = async () => {
   }
 };
 
-// Push Local Storage to Cloud Database (Supabase)
+// Push Local Storage Data to Supabase Cloud
 export const pushCloudDB = async (customUsers = null, customRecords = null) => {
   try {
     const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
@@ -181,10 +180,6 @@ export const pushCloudDB = async (customUsers = null, customRecords = null) => {
   }
 };
 
-export const syncDatabaseDisk = (customUsers = null, customRecords = null) => {
-  pushCloudDB(customUsers, customRecords);
-};
-
 export const getUsers = () => {
   initDB();
   return JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
@@ -195,7 +190,7 @@ export const saveUsers = (users) => {
   try {
     window.dispatchEvent(new CustomEvent("users_updated"));
   } catch (e) {}
-  syncDatabaseDisk(users, null);
+  pushCloudDB(users, null);
 };
 
 export const getStudents = () => {
@@ -255,7 +250,6 @@ export const addStudent = (studentData) => {
     window.dispatchEvent(new CustomEvent("users_updated"));
   } catch (e) {}
 
-  // Sync to Supabase directly
   supabase.from("users").upsert(mapUserToSupabase(newStudent)).then(({ error }) => {
     if (error) console.warn("Supabase addStudent error:", error);
   });
@@ -290,7 +284,6 @@ export const updateStudent = (studentData) => {
       }
     }
 
-    // Push updated student to Supabase
     supabase.from("users").upsert(mapUserToSupabase(updated)).then(({ error }) => {
       if (error) console.warn("Supabase updateStudent error:", error);
     });
@@ -307,7 +300,6 @@ export const deleteStudent = (studentId) => {
     window.dispatchEvent(new CustomEvent("users_updated"));
   } catch (e) {}
 
-  // Delete from Supabase
   supabase.from("users").delete().eq("id", studentId).then(({ error }) => {
     if (error) console.warn("Supabase deleteStudent error:", error);
   });
@@ -324,7 +316,6 @@ export const resetPassword = (studentId, newPassword) => {
   return false;
 };
 
-// Current Session Methods
 export const getCurrentUser = () => {
   const json = localStorage.getItem(DB_KEYS.CURRENT_USER);
   return json ? JSON.parse(json) : null;
@@ -338,7 +329,6 @@ export const setCurrentUser = (user) => {
   }
 };
 
-// Attendance Records Store Methods
 export const getAttendanceRecords = () => {
   initDB();
   return JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
@@ -424,7 +414,6 @@ export const submitAbsenMasuk = (student, keterangan = "", locationData = null) 
 
   saveAttendanceRecords(records);
 
-  // Push immediately to Supabase
   supabase.from("absensi").upsert(mapAbsensiToSupabase(todayRecord)).then(({ error }) => {
     if (error) console.warn("Supabase submitAbsenMasuk error:", error);
   });
@@ -483,7 +472,6 @@ export const submitAbsenPulang = (student, keterangan = "", locationData = null)
 
   saveAttendanceRecords(records);
 
-  // Push immediately to Supabase
   supabase.from("absensi").upsert(mapAbsensiToSupabase(todayRecord)).then(({ error }) => {
     if (error) console.warn("Supabase submitAbsenPulang error:", error);
   });
