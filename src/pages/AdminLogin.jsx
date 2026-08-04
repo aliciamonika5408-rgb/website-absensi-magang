@@ -1,6 +1,7 @@
- import React, { useState } from "react";
+import React, { useState } from "react";
 import { Lock, User, ShieldCheck, AlertCircle, ShieldAlert, ArrowLeft } from "lucide-react";
 import { findUserByNameAndPassword } from "../services/db";
+
 export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -10,19 +11,14 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
     e.preventDefault();
     setErrorMsg("");
 
-    console.log("Username:", username);
-  console.log("Password:", password);
-
-  const admin = findUserByNameAndPassword(username, password);
-
-  console.log("Hasil login:", admin);
-
-  if (admin && admin.role === "admin") {
-    onLoginSuccess(admin);
-  } else {
-    setErrorMsg("Kredensial Administrator tidak valid. Periksa username dan password.");
-  }
-};
+    const admin = findUserByNameAndPassword(username, password);
+    if (admin && admin.role === "admin") {
+      // Memanggil fungsi login sukses bawaan dari App.jsx
+      onLoginSuccess(admin);
+    } else {
+      setErrorMsg("Kredensial Administrator tidak valid. Periksa username dan password.");
+    }
+  };
 
   return (
     <div
@@ -40,7 +36,7 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
         position: "relative"
       }}
     >
-      {/* Back to Student Portal Link */}
+      {/* Tombol Kembali ke Portal Siswa */}
       <button
         onClick={onBackToStudent}
         style={{
@@ -64,7 +60,7 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
         <ArrowLeft size={16} /> Portal Siswa
       </button>
 
-      {/* Admin Login Card Container */}
+      {/* Container Kartu Login Admin */}
       <div
         className="animate-fade-in"
         style={{
@@ -79,7 +75,7 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
           textAlign: "center"
         }}
       >
-        {/* Admin Icon Badge */}
+        {/* Badge Icon Admin */}
         <div
           style={{
             width: "4.5rem",
@@ -127,7 +123,7 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
         )}
 
         <form onSubmit={handleAdminSubmit} style={{ textAlign: "left" }}>
-          {/* Username Input */}
+          {/* Input Username */}
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#cbd5e1", marginBottom: "0.4rem" }}>
               Username Admin
@@ -155,7 +151,7 @@ export default function AdminLogin({ onLoginSuccess, onBackToStudent }) {
             </div>
           </div>
 
-          {/* Password Input */}
+          {/* Input Password */}
           <div style={{ marginBottom: "1.75rem" }}>
             <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#cbd5e1", marginBottom: "0.4rem" }}>
               Password Admin
