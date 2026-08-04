@@ -1,20 +1,74 @@
 import initialData from "../data/database.json";
+import { supabase } from "./supabase";
 
 // Initial Database Records from src/data/database.json
 const INITIAL_STUDENTS = initialData.students;
 const INITIAL_ADMIN = initialData.admin;
 export const COMPANY_INFO = initialData.company;
 
-// Seed Attendance Records - reset to empty
-const generateInitialAttendance = () => {
-  return initialData.attendanceRecords || [];
-};
-
 const DB_KEYS = {
   USERS: "absensi_magang_users_v1",
   ATTENDANCE: "absensi_magang_attendance_v1",
   CURRENT_USER: "absensi_magang_current_user_v1"
 };
+
+// Helper Data Mappers for Supabase (PostgreSQL column names mapping)
+const mapUserFromSupabase = (u) => ({
+  id: u.id,
+  nama: u.nama,
+  pin: u.pin,
+  role: u.role,
+  sekolah: u.sekolah,
+  tempatMagang: u.tempat_magang || u.tempatMagang,
+  noHp: u.no_hp || u.noHp,
+  fotoProfil: u.foto_profil || u.fotoProfil || "/default-avatar.png",
+  password: u.password || u.pin
+});
+
+const mapUserToSupabase = (u) => ({
+  id: u.id,
+  nama: u.nama,
+  pin: u.pin,
+  role: u.role,
+  sekolah: u.sekolah || null,
+  tempat_magang: u.tempatMagang || "PT. MULTI POWER ABADI",
+  no_hp: u.noHp || null,
+  foto_profil: u.fotoProfil || "/default-avatar.png"
+});
+
+const mapAbsensiFromSupabase = (a) => ({
+  id: a.id,
+  studentId: a.student_id || a.studentId,
+  namaSiswa: a.nama_siswa || a.namaSiswa,
+  tanggal: a.tanggal,
+  jamMasuk: a.jam_masuk || a.jamMasuk || "-",
+  ketMasuk: a.keterangan_masuk || a.ketMasuk || a.keterangan || "-",
+  keterangan: a.keterangan_masuk || a.keterangan || "-",
+  jamPulang: a.jam_pulang || a.jamPulang || "-",
+  ketPulang: a.keterangan_pulang || a.ketPulang || "-",
+  keteranganPulang: a.keterangan_pulang || a.keteranganPulang || "-",
+  status: a.status || "Hadir",
+  lat: a.latitude ? Number(a.latitude) : null,
+  lng: a.longitude ? Number(a.longitude) : null,
+  jarakMeters: a.jarak_meters ?? 0,
+  statusLokasi: a.status_lokasi || "Di Area Magang"
+});
+
+const mapAbsensiToSupabase = (a) => ({
+  id: a.id,
+  student_id: a.studentId,
+  nama_siswa: a.namaSiswa,
+  tanggal: a.tanggal,
+  jam_masuk: a.jamMasuk || "-",
+  keterangan_masuk: a.ketMasuk || a.keterangan || "-",
+  jam_pulang: a.jamPulang || "-",
+  keterangan_pulang: a.ketPulang || a.keteranganPulang || "-",
+  status: a.status || "Hadir",
+  latitude: a.lat || null,
+  longitude: a.lng || null,
+  jarak_meters: a.jarakMeters || 0,
+  status_lokasi: a.statusLokasi || "Di Area Magang"
+});
 
 // Simple pseudo-hashing for admin view demonstration
 export const hashPassword = (plainPassword) => {
@@ -30,16 +84,13 @@ export const hashPassword = (plainPassword) => {
 
 // Database Initialization
 export const initDB = () => {
-  // Always ensure default users exist in DB on first run
   const defaultUsers = [INITIAL_ADMIN, ...INITIAL_STUDENTS];
   if (!localStorage.getItem(DB_KEYS.USERS)) {
     localStorage.setItem(DB_KEYS.USERS, JSON.stringify(defaultUsers));
   } else {
-    // Only update admin credentials & existing profile photos, DO NOT re-add deleted users
     const existingUsers = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
     let hasChanges = false;
 
-    // Ensure Admin always exists
     const adminIdx = existingUsers.findIndex(u => u.id === "admin-1" || u.role === "admin");
     if (adminIdx === -1) {
       existingUsers.unshift(INITIAL_ADMIN);
@@ -53,21 +104,6 @@ export const initDB = () => {
       }
     }
 
-    // Update avatar paths for existing students
-    existingUsers.forEach(u => {
-      if (u.id === "std-1" && u.fotoProfil !== "/alicia-profile.jpg") {
-        u.fotoProfil = "/alicia-profile.jpg";
-        hasChanges = true;
-      } else if (u.id === "std-2" && u.fotoProfil !== "/aisyah-profile.png") {
-        u.fotoProfil = "/aisyah-profile.png";
-        hasChanges = true;
-      } else if (["std-3", "std-4", "std-5", "std-6"].includes(u.id) && u.fotoProfil !== "/default-avatar.png") {
-        u.fotoProfil = "/default-avatar.png";
-        hasChanges = true;
-      }
-    });
-
-    // Deduplicate existingUsers by ID (clean up any previous duplicates)
     const seenIds = new Set();
     const cleanUsers = [];
     existingUsers.forEach(u => {
@@ -82,132 +118,83 @@ export const initDB = () => {
     if (hasChanges || cleanUsers.length !== existingUsers.length) {
       localStorage.setItem(DB_KEYS.USERS, JSON.stringify(cleanUsers));
     }
-
-    const cur = getCurrentUser();
-    if (cur && (cur.id === "admin-1" || cur.role === "admin")) {
-      if (cur.nama !== INITIAL_ADMIN.nama || cur.username !== INITIAL_ADMIN.username) {
-        cur.nama = INITIAL_ADMIN.nama;
-        cur.username = INITIAL_ADMIN.username;
-        setCurrentUser(cur);
-      }
-    } else if (cur && cur.id === "std-1" && cur.fotoProfil !== "/alicia-profile.jpg") {
-      cur.fotoProfil = "/alicia-profile.jpg";
-      setCurrentUser(cur);
-    } else if (cur && cur.id === "std-2" && cur.fotoProfil !== "/aisyah-profile.png") {
-      cur.fotoProfil = "/aisyah-profile.png";
-      setCurrentUser(cur);
-    } else if (cur && ["std-3", "std-4", "std-5", "std-6"].includes(cur.id) && cur.fotoProfil !== "/default-avatar.png") {
-      cur.fotoProfil = "/default-avatar.png";
-      setCurrentUser(cur);
-    }
   }
 
   if (!localStorage.getItem(DB_KEYS.ATTENDANCE)) {
     localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(initialData.attendanceRecords || []));
   }
+
+  // Trigger async Supabase fetch in background
+  fetchCloudDB();
 };
 
-// Users Store Methods
+// Sync Cloud Supabase Database to Local Storage
+export const fetchCloudDB = async () => {
+  try {
+    const { data: usersData, error: usersErr } = await supabase.from("users").select("*");
+    const { data: absensiData, error: absensiErr } = await supabase.from("absensi").select("*");
+
+    let updated = false;
+
+    if (!usersErr && usersData && usersData.length > 0) {
+      const mappedUsers = usersData.map(mapUserFromSupabase);
+      localStorage.setItem(DB_KEYS.USERS, JSON.stringify(mappedUsers));
+      try {
+        window.dispatchEvent(new CustomEvent("users_updated"));
+      } catch (e) {}
+      updated = true;
+    }
+
+    if (!absensiErr && absensiData) {
+      const mappedAbsensi = absensiData.map(mapAbsensiFromSupabase);
+      localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(mappedAbsensi));
+      try {
+        window.dispatchEvent(new CustomEvent("attendance_updated"));
+      } catch (e) {}
+      updated = true;
+    }
+
+    return updated;
+  } catch (e) {
+    console.warn("Supabase fetch notice:", e);
+    return false;
+  }
+};
+
+// Push Local Storage to Cloud Database (Supabase)
+export const pushCloudDB = async (customUsers = null, customRecords = null) => {
+  try {
+    const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
+    const attendanceRecords = customRecords || JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
+
+    if (allUsers.length > 0) {
+      const payloadUsers = allUsers.map(mapUserToSupabase);
+      await supabase.from("users").upsert(payloadUsers);
+    }
+
+    if (attendanceRecords.length > 0) {
+      const payloadAbsensi = attendanceRecords.map(mapAbsensiToSupabase);
+      await supabase.from("absensi").upsert(payloadAbsensi);
+    }
+  } catch (e) {
+    console.warn("Supabase push notice:", e);
+  }
+};
+
+export const syncDatabaseDisk = (customUsers = null, customRecords = null) => {
+  pushCloudDB(customUsers, customRecords);
+};
+
 export const getUsers = () => {
   initDB();
   return JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
-};
-
-const CLOUD_DB_URL = "https://jsonblob.com/api/jsonBlob/019fc670-75fd-740b-98ac-48d2fbb1f326";
-
-// Track last push timestamp to prevent fetch overwriting a pending push
-let _lastPushTime = 0;
-
-// Sync Cloud Database to Local Storage
-export const fetchCloudDB = async () => {
-  // Skip fetch if a push just happened within the last 5 seconds
-  if (Date.now() - _lastPushTime < 5000) return false;
-
-  try {
-    const res = await fetch(CLOUD_DB_URL, {
-      headers: { "Accept": "application/json" }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      let updated = false;
-
-      if (data.users && Array.isArray(data.users) && data.users.length > 0) {
-        localStorage.setItem(DB_KEYS.USERS, JSON.stringify(data.users));
-        window.dispatchEvent(new CustomEvent("users_updated"));
-        updated = true;
-      }
-
-      if (data.attendance && Array.isArray(data.attendance)) {
-        localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(data.attendance));
-        window.dispatchEvent(new CustomEvent("attendance_updated"));
-        updated = true;
-      }
-
-      return updated;
-    }
-  } catch (e) {
-    console.warn("Cloud DB fetch notice:", e);
-  }
-  return false;
-};
-
-// Push Local Storage to Cloud Database
-export const pushCloudDB = async (customUsers = null, customRecords = null) => {
-  _lastPushTime = Date.now(); // mark push time to pause fetchCloudDB for 5s
-  try {
-    const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
-    const attendanceRecords = customRecords || JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
-
-    await fetch(CLOUD_DB_URL, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        users: allUsers,
-        attendance: attendanceRecords
-      })
-    });
-    console.log("Cloud DB push complete. Users:", allUsers.filter(u => u.role === "siswa").length, "students");
-  } catch (e) {
-    console.warn("Cloud DB push notice:", e);
-  }
-};
-
-// Auto Sync to Disk Endpoint & Cloud DB
-export const syncDatabaseDisk = (customUsers = null, customRecords = null) => {
-  pushCloudDB(customUsers, customRecords);
-  try {
-    const allUsers = customUsers || JSON.parse(localStorage.getItem(DB_KEYS.USERS) || "[]");
-    const students = allUsers.filter(u => u.role === "siswa");
-    const admin = allUsers.find(u => u.role === "admin") || INITIAL_ADMIN;
-    const attendanceRecords = customRecords || JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || "[]");
-
-    fetch("/api/save-database", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company: COMPANY_INFO,
-        admin: admin,
-        students: students,
-        attendanceRecords: attendanceRecords
-      })
-    }).catch(err => {
-      console.warn("Disk database sync notice:", err);
-    });
-  } catch (e) {
-    console.warn("Disk database sync error:", e);
-  }
 };
 
 export const saveUsers = (users) => {
   localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
   try {
     window.dispatchEvent(new CustomEvent("users_updated"));
-  } catch (e) {
-    // Ignore in non-browser env
-  }
+  } catch (e) {}
   syncDatabaseDisk(users, null);
 };
 
@@ -225,13 +212,11 @@ export const findUserByNameAndPassword = (nama, password) => {
   const inputNama = nama.trim().toLowerCase();
   const inputPass = password.trim();
 
-  // Always check against INITIAL_ADMIN from database.json first (source of truth)
   const adminNama = (INITIAL_ADMIN.nama || "").trim().toLowerCase();
   const adminUsername = (INITIAL_ADMIN.username || "").trim().toLowerCase();
   const isAdminMatch = (inputNama === adminUsername || inputNama === adminNama || inputNama === "admin123" || inputNama === "admin");
 
   if (isAdminMatch && inputPass === INITIAL_ADMIN.password) {
-    // Also force-update localStorage so it stays in sync
     const users = getUsers();
     const adminIdx = users.findIndex(u => u.id === "admin-1");
     if (adminIdx !== -1) {
@@ -265,11 +250,16 @@ export const addStudent = (studentData) => {
     newStudent.fotoProfil = "/default-avatar.svg";
   }
   users.push(newStudent);
-  // Save to localStorage immediately
   localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
-  window.dispatchEvent(new CustomEvent("users_updated"));
-  // Push to Cloud DB immediately so all laptops see the new student
-  pushCloudDB(users, null);
+  try {
+    window.dispatchEvent(new CustomEvent("users_updated"));
+  } catch (e) {}
+
+  // Sync to Supabase directly
+  supabase.from("users").upsert(mapUserToSupabase(newStudent)).then(({ error }) => {
+    if (error) console.warn("Supabase addStudent error:", error);
+  });
+
   return newStudent;
 };
 
@@ -281,13 +271,11 @@ export const updateStudent = (studentData) => {
     users[index] = updated;
     saveUsers(users);
 
-    // Update active user session if editing current student
     const currentUser = getCurrentUser();
     if (currentUser && currentUser.id === studentData.id) {
       setCurrentUser(updated);
     }
 
-    // Sync student name in attendance records if changed
     if (studentData.nama) {
       const records = getAttendanceRecords();
       let hasUpdates = false;
@@ -302,6 +290,11 @@ export const updateStudent = (studentData) => {
       }
     }
 
+    // Push updated student to Supabase
+    supabase.from("users").upsert(mapUserToSupabase(updated)).then(({ error }) => {
+      if (error) console.warn("Supabase updateStudent error:", error);
+    });
+
     return updated;
   }
   return null;
@@ -309,11 +302,15 @@ export const updateStudent = (studentData) => {
 
 export const deleteStudent = (studentId) => {
   const users = getUsers().filter(u => u.id !== studentId);
-  // Save to localStorage immediately
   localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
-  window.dispatchEvent(new CustomEvent("users_updated"));
-  // Push deletion to Cloud DB immediately so all laptops stay in sync
-  pushCloudDB(users, null);
+  try {
+    window.dispatchEvent(new CustomEvent("users_updated"));
+  } catch (e) {}
+
+  // Delete from Supabase
+  supabase.from("users").delete().eq("id", studentId).then(({ error }) => {
+    if (error) console.warn("Supabase deleteStudent error:", error);
+  });
 };
 
 export const resetPassword = (studentId, newPassword) => {
@@ -351,16 +348,16 @@ export const saveAttendanceRecords = (records) => {
   localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(records));
   try {
     window.dispatchEvent(new CustomEvent("attendance_updated"));
-  } catch (e) {
-    // Ignore in non-browser env
-  }
-  // Push to Cloud DB so all devices get the updated attendance
+  } catch (e) {}
   pushCloudDB(null, records);
 };
 
 export const deleteAttendanceRecord = (recordId) => {
   const records = getAttendanceRecords().filter(r => r.id !== recordId);
   saveAttendanceRecords(records);
+  supabase.from("absensi").delete().eq("id", recordId).then(({ error }) => {
+    if (error) console.warn("Supabase deleteAttendanceRecord error:", error);
+  });
 };
 
 export const getStudentAttendanceHistory = (studentId) => {
@@ -377,7 +374,6 @@ export const getTodayAttendance = (studentId) => {
 };
 
 export const submitAbsenMasuk = (student, keterangan = "", locationData = null) => {
-  // If 2nd parameter is locationData object instead of string (backwards compat)
   if (typeof keterangan === "object" && keterangan !== null && !locationData) {
     locationData = keterangan;
     keterangan = "";
@@ -398,6 +394,7 @@ export const submitAbsenMasuk = (student, keterangan = "", locationData = null) 
 
   if (todayRecord) {
     todayRecord.jamMasuk = nowTime;
+    todayRecord.ketMasuk = keterangan || todayRecord.ketMasuk || "-";
     todayRecord.keterangan = keterangan || todayRecord.keterangan || "-";
     todayRecord.status = "Hadir";
     todayRecord.lat = locInfo.lat;
@@ -411,11 +408,12 @@ export const submitAbsenMasuk = (student, keterangan = "", locationData = null) 
       namaSiswa: student.nama,
       tanggal: today,
       jamMasuk: nowTime,
-      jamPulang: "-",
+      ketMasuk: keterangan || "-",
       keterangan: keterangan || "-",
+      jamPulang: "-",
+      ketPulang: "-",
+      keteranganPulang: "-",
       status: "Hadir",
-      fotoMasuk: null,
-      fotoPulang: null,
       lat: locInfo.lat,
       lng: locInfo.lng,
       jarakMeters: locInfo.jarakMeters,
@@ -425,11 +423,16 @@ export const submitAbsenMasuk = (student, keterangan = "", locationData = null) 
   }
 
   saveAttendanceRecords(records);
+
+  // Push immediately to Supabase
+  supabase.from("absensi").upsert(mapAbsensiToSupabase(todayRecord)).then(({ error }) => {
+    if (error) console.warn("Supabase submitAbsenMasuk error:", error);
+  });
+
   return todayRecord;
 };
 
 export const submitAbsenPulang = (student, keterangan = "", locationData = null) => {
-  // If 2nd parameter is locationData object instead of string (backwards compat)
   if (typeof keterangan === "object" && keterangan !== null && !locationData) {
     locationData = keterangan;
     keterangan = "";
@@ -450,12 +453,13 @@ export const submitAbsenPulang = (student, keterangan = "", locationData = null)
 
   if (todayRecord) {
     todayRecord.jamPulang = nowTime;
+    todayRecord.ketPulang = keterangan || todayRecord.ketPulang || "-";
     todayRecord.keteranganPulang = keterangan || todayRecord.keteranganPulang || "-";
     todayRecord.status = "Hadir";
-    todayRecord.latPulang = locInfo.lat;
-    todayRecord.lngPulang = locInfo.lng;
-    todayRecord.jarakMetersPulang = locInfo.jarakMeters;
-    todayRecord.statusLokasiPulang = locInfo.statusLokasi;
+    todayRecord.lat = locInfo.lat;
+    todayRecord.lng = locInfo.lng;
+    todayRecord.jarakMeters = locInfo.jarakMeters;
+    todayRecord.statusLokasi = locInfo.statusLokasi;
   } else {
     todayRecord = {
       id: `att-${Date.now()}`,
@@ -463,12 +467,12 @@ export const submitAbsenPulang = (student, keterangan = "", locationData = null)
       namaSiswa: student.nama,
       tanggal: today,
       jamMasuk: "-",
-      jamPulang: nowTime,
+      ketMasuk: "-",
       keterangan: "-",
+      jamPulang: nowTime,
+      ketPulang: keterangan || "-",
       keteranganPulang: keterangan || "-",
       status: "Hadir",
-      fotoMasuk: null,
-      fotoPulang: null,
       lat: locInfo.lat,
       lng: locInfo.lng,
       jarakMeters: locInfo.jarakMeters,
@@ -478,5 +482,11 @@ export const submitAbsenPulang = (student, keterangan = "", locationData = null)
   }
 
   saveAttendanceRecords(records);
+
+  // Push immediately to Supabase
+  supabase.from("absensi").upsert(mapAbsensiToSupabase(todayRecord)).then(({ error }) => {
+    if (error) console.warn("Supabase submitAbsenPulang error:", error);
+  });
+
   return todayRecord;
 };
